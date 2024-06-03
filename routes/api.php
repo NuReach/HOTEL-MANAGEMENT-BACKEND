@@ -15,7 +15,10 @@ Route::post('/logout', [AuthController::class, 'logout'])->middleware('auth:sanc
 
 
 Route::middleware(['auth:sanctum'])->group(function () {
+    Route::get('/users', [UserController::class, 'index']);
+    Route::get('/users/auth', [UserController::class, 'show']);
     Route::post('/update/image', [UserController::class, 'updateProfilePicture']);
+
 });
 
 
