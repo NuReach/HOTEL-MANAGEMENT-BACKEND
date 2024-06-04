@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\api;
 
+use App\Models\Room;
 use App\Models\RoomType;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
@@ -15,7 +16,7 @@ class RoomTypeController extends Controller
     {
         $user = auth()->user();
         $user_id = $user->id;
-        $roomTypes = RoomType::where('user_id',$user_id)->get();
+        $roomTypes = RoomType::where('user_id',$user_id)->with('room')->get();
         return response()->json($roomTypes, 200);
     }
 
@@ -24,16 +25,68 @@ class RoomTypeController extends Controller
      */
     public function store(Request $request)
     {
+    
         $request->validate([
             'name' => 'required|string',
             'user_id' => 'required|integer|string',
+            'total_adult' => 'nullable|string',
+            'total_child' => 'nullable|string',
+            'room_capacity' => 'nullable|string',
+            'price' => 'required|string', 
+            'size' => 'nullable|string',
+            'view' => 'nullable|string',
+            'bed_style' => 'nullable|string',
+            'discount' => 'nullable|integer',
+            'short_desc' => 'nullable|string',
+            'description' => 'nullable|string',
+            'status' => 'nullable|integer|in:0,1',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
         ]);
 
-        $roomType = RoomType::create($request->all());
-       
+        $roomTypeId = RoomType::insertGetId([
+            'name' => $request->name,
+            'user_id' => $request->user_id
+        ]);
+
+        if (!$roomTypeId) {
+            return response()->json(['message'=>'Something went wrong with creating room type!!'], 500);
+        }
+
+        $imageUrl = null;
+
+        if ( $request->hasFile('image') ) {
+
+            $user = auth()->user(); 
+            $image = $request->file('image');
+            $imageName = $user->name. 'room' . time() . '.' . $image->getClientOriginalExtension();
+
+            $image->move(public_path('images'), $imageName);
+
+            $imageUrl = asset('images/' . $imageName);
+
+        }
+
+        $room = new Room;
+        $room->roomtype_id = $roomTypeId;
+        $room->total_adult = $request->total_adult;
+        $room->total_child = $request->total_child;
+        $room->room_capacity = $request->room_capacity;
+        $room->price = $request->price;
+        $room->size = $request->size;
+        $room->view = $request->view;
+        $room->bed_style = $request->bed_style;
+        $room->discount = $request->discount;
+        $room->short_desc = $request->short_desc;
+        $room->description = $request->description;
+        $room->status = $request->status;
+        $room->image = $imageUrl;
+
+        $room->save();
+
+
         return response()->json([
-            'roomtype'=>$roomType,
-            'message'=>'Room type is created succesfully'
+            'roomtype'=>$room,
+            'message'=>'Room  is created succesfully'
         ], 201);
     }
 
@@ -47,9 +100,7 @@ class RoomTypeController extends Controller
         return response()->json($roomType, 200);
     }
 
-    /**
-     * Update the specified resource in storage.
-     */
+
     public function update(Request $request, $id)
     {
         $roomType = RoomType::findOrFail($id);
@@ -72,9 +123,9 @@ class RoomTypeController extends Controller
      */
     public function destroy($id)
     {
-        $roomType = RoomType::findOrFail($id);
+        $roomType = RoomType::findOrFail($id)->delete();
 
-        $roomType->delete();
+        $rooms =  Room::where('roomtype_id', $roomType->id)->delete();
 
         return response()->json(['message' => 'Room type deleted successfully'], 200);
     }
