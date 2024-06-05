@@ -17,7 +17,7 @@ return new class extends Migration
             $table->string('total_adult')->nullable();
             $table->string('total_child')->nullable();
             $table->string('room_capacity')->nullable();
-            $table->string('image')->default('default.png');
+            $table->string('image')->nullable();
             $table->string('price')->nullable();
             $table->string('size')->nullable();
             $table->string('view')->nullable();
@@ -27,7 +27,10 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->integer('status')->default(0);
 
-            $table->foreign('roomtype_id')->references('id')->on('roomtypes'); 
+            $table->foreign('roomtype_id')
+            ->references('id')
+            ->on('room_types')
+            ->onDelete('cascade');
 
             $table->timestamps();
         });

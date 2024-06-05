@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\api;
 
 use App\Models\Room;
+use App\Models\Facility;
 use App\Models\RoomType;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
@@ -16,7 +17,10 @@ class RoomTypeController extends Controller
     {
         $user = auth()->user();
         $user_id = $user->id;
-        $roomTypes = RoomType::where('user_id',$user_id)->with('room')->get();
+        $roomTypes = RoomType::where('user_id',$user_id)
+                    ->with('room')
+                    ->with('room.facilities')
+                    ->get();
         return response()->json($roomTypes, 200);
     }
 
@@ -41,6 +45,7 @@ class RoomTypeController extends Controller
             'description' => 'nullable|string',
             'status' => 'nullable|integer|in:0,1',
             'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'facilites' => 'nullable|array'
         ]);
 
         $roomTypeId = RoomType::insertGetId([
@@ -83,6 +88,16 @@ class RoomTypeController extends Controller
 
         $room->save();
 
+        if ($room->save()) {
+            $facilityCount = Count($request->facilities);
+            for ($i=0; $i < $facilityCount ; $i++) { 
+                $facility = new Facility;
+                $facility->room_id = $room->id;
+                $facility->name = $request->facilities[$i];
+                $facility->save(); 
+            }
+        }
+
 
         return response()->json([
             'roomtype'=>$room,
@@ -121,6 +136,7 @@ class RoomTypeController extends Controller
             'short_desc' => 'nullable|string',
             'description' => 'nullable|string',
             'status' => 'nullable|integer|in:0,1',
+            'facilites' => 'nullable|array'
         ]);
 
         $roomType->name = $request->name;
@@ -165,6 +181,19 @@ class RoomTypeController extends Controller
         $roomType->save();
         $room->save();
 
+        if ($roomType->save() && $room->save()) {
+            if ($request->facilites !== null ) {
+                Facility::where('room_id',$room->id)->delete();
+                $facilityCount = Count($request->facilities);
+                for ($i=0; $i < $facilityCount ; $i++) { 
+                    $facility = new Facility;
+                    $facility->room_id = $room->id;
+                    $facility->name = $request->facilities[$i];
+                    $facility->save(); 
+                }
+            }
+        }
+
 
         return response()->json([
             'roomtype'=>$roomType,
@@ -179,10 +208,16 @@ class RoomTypeController extends Controller
     {
         $roomType = RoomType::findOrFail($id);
     
+        // Delete facilities associated with the rooms
         Room::where('roomtype_id', $roomType->id)->delete();
     
+        // Delete rooms associated with the room type
+        Facility::whereIn('room_id', $roomType->rooms()->pluck('id'))->delete();
+    
+        // Delete the room type
         $roomType->delete();
     
-        return response()->json(['message' => 'Room type and associated rooms deleted successfully'], 200); 
+        return response()->json(['message' => 'Room type and associated rooms and facilities have been deleted successfully'], 200); 
     }
+    
 }
