@@ -191,13 +191,18 @@ class RoomTypeController extends Controller
             $room->image = $request->image;
         }
 
-        if ($request->facilites !== null ) {
-            Facility::where('room_id',$room->id)->delete();
-            $facilityCount = Count($request->facilities);   
+        if ($request->facilities) {
+            $existedFacilites = Facility::where('room_id',$room->id)->get();
+            
+            if ($existedFacilites) {
+                Facility::where('room_id',$room->id)->delete();  
+            }
+            
+            $facilityCount = count($request->facilities);   
             for ($i=0; $i < $facilityCount ; $i++) { 
                 $facility = new Facility;
                 $facility->room_id = $room->id;
-                $facility->name = $request->facilities[$i];
+                $facility->facility_name = $request->facilities[$i];
                 $facility->save(); 
             }
         }
@@ -208,7 +213,7 @@ class RoomTypeController extends Controller
         DB::commit();
 
         return response()->json([
-            'roomtype'=>$roomType->with('room')->with('room.facility'),
+            'roomtype'=>$roomType,
             'message'=>'Room type is updated succesfully'
         ], 201);
         
