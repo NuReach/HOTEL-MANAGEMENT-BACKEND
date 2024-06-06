@@ -37,6 +37,10 @@ Route::middleware(['auth:sanctum','seller'])->group(function () {
         Route::post('/roomstype/update/{id}', 'update');
         Route::delete('/roomstype/delete/{id}', 'destroy');
     });
+    Route::controller(RoomTypeController::class)->group(function () {
+        Route::delete('/roomstype/gallary/delete/{gallaryId}', 'deleteImageGallary');
+    });
+
 });
 
 

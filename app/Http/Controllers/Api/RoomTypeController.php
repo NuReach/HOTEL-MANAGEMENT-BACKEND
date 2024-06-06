@@ -5,6 +5,7 @@ namespace App\Http\Controllers\api;
 use App\Models\Room;
 use App\Models\Facility;
 use App\Models\RoomType;
+use App\Models\MultiImage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
@@ -21,6 +22,7 @@ class RoomTypeController extends Controller
         $roomTypes = RoomType::where('user_id',$user_id)
                     ->with('room')
                     ->with('room.facilities')
+                    ->with('room.gallary')
                     ->get();
         return response()->json($roomTypes, 200);
     }
@@ -30,27 +32,25 @@ class RoomTypeController extends Controller
      */
     public function store(Request $request)
     {
+        $request->validate([
+            'name' => 'required|string',
+            'user_id' => 'required|integer|string',
+            'total_adult' => 'nullable|string',
+            'total_child' => 'nullable|string',
+            'room_capacity' => 'nullable|string',
+            'price' => 'required|string', 
+            'size' => 'nullable|string',
+            'view' => 'nullable|string',
+            'bed_style' => 'nullable|string',
+            'discount' => 'nullable|integer',
+            'short_desc' => 'nullable|string',
+            'description' => 'nullable|string',
+            'status' => 'nullable|integer|in:0,1',
+            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+            'facilites' => 'nullable|array'
+        ]);
         DB::beginTransaction();
         try {
-           
-            $request->validate([
-                'name' => 'required|string',
-                'user_id' => 'required|integer|string',
-                'total_adult' => 'nullable|string',
-                'total_child' => 'nullable|string',
-                'room_capacity' => 'nullable|string',
-                'price' => 'required|string', 
-                'size' => 'nullable|string',
-                'view' => 'nullable|string',
-                'bed_style' => 'nullable|string',
-                'discount' => 'nullable|integer',
-                'short_desc' => 'nullable|string',
-                'description' => 'nullable|string',
-                'status' => 'nullable|integer|in:0,1',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-                'facilites' => 'nullable|array'
-            ]);
-
             $roomType = RoomType::create([
                 'name' => $request->name,
                 'user_id' => $request->user_id
@@ -98,6 +98,19 @@ class RoomTypeController extends Controller
                     $facility->room_id = $room->id;
                     $facility->facility_name = $request->facilities[$i];
                     $facility->save(); 
+                }
+            }
+
+            if ($request->file('gallary')) {
+                foreach ($request->file('gallary') as $key => $image) {
+                    $user = auth()->user();
+                    $multiImageName = $user->name. 'room-gallary' . $key . time() . '.' . $image->getClientOriginalExtension();
+                    $image->move(public_path('images'), $multiImageName);
+                    $multiImageUrl = asset('images/' . $multiImageName);
+                    $multiImage = new MultiImage;
+                    $multiImage->room_id = $room->id;
+                    $multiImage->multi_img = $multiImageUrl;
+                    $multiImage->save();
                 }
             }
     
@@ -206,6 +219,19 @@ class RoomTypeController extends Controller
                 $facility->save(); 
             }
         }
+
+        if ($request->file('gallary')) {
+            foreach ($request->file('gallary') as $image) {
+                $user = auth()->user();
+                $multiImageName = $user->name. 'room-gallary' . time() . '.' . $image->getClientOriginalExtension();
+                $image->move(public_path('images'), $multiImageName);
+                $multiImageUrl = asset('images/' . $multiImageName);
+                $multiImage = new MultiImage;
+                $multiImage->room_id = $room->id;
+                $multiImage->multi_img = $multiImageUrl;
+                $multiImage->save();
+            }
+        }
         
         $roomType->save();
         $room->save();
@@ -228,7 +254,9 @@ class RoomTypeController extends Controller
      */
     public function destroy($id)
     {
+        DB::beginTransaction();
         $roomType = RoomType::findOrFail($id);
+        try {
         $oldImageUrl = $roomType->room->image;
         if ($oldImageUrl) {
             $filename = basename($oldImageUrl);
@@ -237,9 +265,27 @@ class RoomTypeController extends Controller
                 unlink($image_path);
             }
         }
+        
+
+        $roomId = $roomType->room->id;
+        $gallary = MultiImage::where('room_id',$roomId)->get();
+
+        foreach ($gallary as $key => $image) {
+            $oldImageGallaryUrl = $image->multi_img;
+            $fileGallaryname = basename($oldImageGallaryUrl);
+            $image_path_gallary = public_path('images/' . $fileGallaryname);
+            if (file_exists($image_path_gallary)) {
+                unlink($image_path_gallary);
+            }
+        }
+
         $roomType->delete();
-    
-        return response()->json(['message' => 'Room type and associated rooms and facilities have been deleted successfully'], 200); 
+        DB::commit();
+        return response()->json(['message' => "Room is deleted succesfully"], 200); 
+        } catch (\Throwable $th) {
+            DB::rollback();
+            return response()->json(['message' => 'Something went wrong!!'], 200); 
+        }
     }
     
 }
