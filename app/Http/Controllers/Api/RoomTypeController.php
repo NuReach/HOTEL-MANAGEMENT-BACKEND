@@ -6,6 +6,7 @@ use App\Models\Room;
 use App\Models\Facility;
 use App\Models\RoomType;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use App\Http\Controllers\Controller;
 
 class RoomTypeController extends Controller
@@ -29,80 +30,87 @@ class RoomTypeController extends Controller
      */
     public function store(Request $request)
     {
+        DB::beginTransaction();
+        try {
+           
+            $request->validate([
+                'name' => 'required|string',
+                'user_id' => 'required|integer|string',
+                'total_adult' => 'nullable|string',
+                'total_child' => 'nullable|string',
+                'room_capacity' => 'nullable|string',
+                'price' => 'required|string', 
+                'size' => 'nullable|string',
+                'view' => 'nullable|string',
+                'bed_style' => 'nullable|string',
+                'discount' => 'nullable|integer',
+                'short_desc' => 'nullable|string',
+                'description' => 'nullable|string',
+                'status' => 'nullable|integer|in:0,1',
+                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
+                'facilites' => 'nullable|array'
+            ]);
+
+            $roomType = RoomType::create([
+                'name' => $request->name,
+                'user_id' => $request->user_id
+            ]);
     
-        $request->validate([
-            'name' => 'required|string',
-            'user_id' => 'required|integer|string',
-            'total_adult' => 'nullable|string',
-            'total_child' => 'nullable|string',
-            'room_capacity' => 'nullable|string',
-            'price' => 'required|string', 
-            'size' => 'nullable|string',
-            'view' => 'nullable|string',
-            'bed_style' => 'nullable|string',
-            'discount' => 'nullable|integer',
-            'short_desc' => 'nullable|string',
-            'description' => 'nullable|string',
-            'status' => 'nullable|integer|in:0,1',
-            'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'facilites' => 'nullable|array'
-        ]);
-
-        $roomTypeId = RoomType::insertGetId([
-            'name' => $request->name,
-            'user_id' => $request->user_id
-        ]);
-
-        if (!$roomTypeId) {
-            return response()->json(['message'=>'Something went wrong with creating room type!!'], 500);
-        }
-
-        $imageUrl = 'default.png';
-
-        if ( $request->hasFile('image') ) {
-
-            $user = auth()->user(); 
-            $image = $request->file('image');
-            $imageName = $user->name. 'room' . time() . '.' . $image->getClientOriginalExtension();
-
-            $image->move(public_path('images'), $imageName);
-
-            $imageUrl = asset('images/' . $imageName);
-
-        }
-
-        $room = new Room;
-        $room->roomtype_id = $roomTypeId;
-        $room->total_adult = $request->total_adult;
-        $room->total_child = $request->total_child;
-        $room->room_capacity = $request->room_capacity;
-        $room->price = $request->price;
-        $room->size = $request->size;
-        $room->view = $request->view;
-        $room->bed_style = $request->bed_style;
-        $room->discount = $request->discount;
-        $room->short_desc = $request->short_desc;
-        $room->description = $request->description;
-        $room->status = $request->status;
-        $room->image = $imageUrl;
-
-        $room->save();
-
-        if ($room->save()) {
-            $facilityCount = Count($request->facilities);
-            for ($i=0; $i < $facilityCount ; $i++) { 
-                $facility = new Facility;
-                $facility->room_id = $room->id;
-                $facility->name = $request->facilities[$i];
-                $facility->save(); 
+            if (!$roomType->id) {
+                return response()->json(['message'=>'Something went wrong with creating room type!!'], 500);
             }
+    
+            $imageUrl = 'default.png';
+    
+            if ( $request->hasFile('image') ) {
+    
+                $user = auth()->user(); 
+                $image = $request->file('image');
+                $imageName = $user->name. 'room' . time() . '.' . $image->getClientOriginalExtension();
+    
+                $image->move(public_path('images'), $imageName);
+    
+                $imageUrl = asset('images/' . $imageName);
+    
+            }
+    
+            $room = new Room;
+            $room->roomtype_id = $roomType->id;
+            $room->total_adult = $request->total_adult;
+            $room->total_child = $request->total_child;
+            $room->room_capacity = $request->room_capacity;
+            $room->price = $request->price;
+            $room->size = $request->size;
+            $room->view = $request->view;
+            $room->bed_style = $request->bed_style;
+            $room->discount = $request->discount;
+            $room->short_desc = $request->short_desc;
+            $room->description = $request->description;
+            $room->status = $request->status;
+            $room->image = $imageUrl;
+    
+            $room->save();
+    
+            if ($room->save()) {
+                $facilityCount = Count($request->facilities);
+                for ($i=0; $i < $facilityCount ; $i++) { 
+                    $facility = new Facility;
+                    $facility->room_id = $room->id;
+                    $facility->facility_name = $request->facilities[$i];
+                    $facility->save(); 
+                }
+            }
+    
+            DB::commit();
+            return response()->json([
+                'room' => $room,
+                'roomtype'=>$roomType,
+                'message' => 'Room is created successfully'
+            ], 201);
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['message' => 'Something went wrong with creating room type or room'], 500);
         }
-
-
-        return response()->json([
-            'roomtype'=>$room,
-            'message'=>'Room  is created succesfully'
-        ], 201);
     }
 
     /**
@@ -112,49 +120,54 @@ class RoomTypeController extends Controller
     {
         $roomType = RoomType::findOrFail($id);
 
-        return response()->json($roomType, 200);
+        return response()->json($roomType->with('room')->with('room.facility'), 200);
     }
 
 
     public function update(Request $request, $id)
     {
-        $roomType = RoomType::findOrFail($id);
+        DB::beginTransaction();
+        try {
 
-        $room = $roomType->room;
+            $roomType = RoomType::findOrFail($id);
 
-        $request->validate([
-            'name' => 'required|string',
-            'user_id' => 'required|integer|string',
-            'total_adult' => 'nullable|string',
-            'total_child' => 'nullable|string',
-            'room_capacity' => 'nullable|string',
-            'price' => 'required|string', 
-            'size' => 'nullable|string',
-            'view' => 'nullable|string',
-            'bed_style' => 'nullable|string',
-            'discount' => 'nullable|integer',
-            'short_desc' => 'nullable|string',
-            'description' => 'nullable|string',
-            'status' => 'nullable|integer|in:0,1',
-            'facilites' => 'nullable|array'
-        ]);
+            $room = $roomType->room;
+    
+            $request->validate([
+                'name' => 'required|string',
+                'user_id' => 'required|integer|string',
+                'total_adult' => 'nullable|string',
+                'total_child' => 'nullable|string',
+                'room_capacity' => 'nullable|string',
+                'price' => 'required|string', 
+                'size' => 'nullable|string',
+                'view' => 'nullable|string',
+                'bed_style' => 'nullable|string',
+                'discount' => 'nullable|integer',
+                'short_desc' => 'nullable|string',
+                'description' => 'nullable|string',
+                'status' => 'nullable|integer|in:0,1',
+                'facilites' => 'nullable|array'
+            ]);
 
-        $roomType->name = $request->name;
-        $roomType->user_id = $request->user_id;
+            //update room type
+            $roomType->name = $request->name;
+            $roomType->user_id = $request->user_id;
+    
+            //update room
+            $room->total_adult = $request->total_adult;
+            $room->total_child = $request->total_child;
+            $room->room_capacity = $request->room_capacity;
+            $room->price = $request->price;
+            $room->size = $request->size;
+            $room->view = $request->view;
+            $room->bed_style = $request->bed_style;
+            $room->discount = $request->discount;
+            $room->short_desc = $request->short_desc;
+            $room->description = $request->description;
+            $room->status = $request->status;
 
-        $room->total_adult = $request->total_adult;
-        $room->total_child = $request->total_child;
-        $room->room_capacity = $request->room_capacity;
-        $room->price = $request->price;
-        $room->size = $request->size;
-        $room->view = $request->view;
-        $room->bed_style = $request->bed_style;
-        $room->discount = $request->discount;
-        $room->short_desc = $request->short_desc;
-        $room->description = $request->description;
-        $room->status = $request->status;
-       
-
+            //update image
         if ($request->hasFile('image')) {
             //add image to folder
             $user = auth()->user(); 
@@ -178,27 +191,31 @@ class RoomTypeController extends Controller
             $room->image = $request->image;
         }
 
+        if ($request->facilites !== null ) {
+            Facility::where('room_id',$room->id)->delete();
+            $facilityCount = Count($request->facilities);   
+            for ($i=0; $i < $facilityCount ; $i++) { 
+                $facility = new Facility;
+                $facility->room_id = $room->id;
+                $facility->name = $request->facilities[$i];
+                $facility->save(); 
+            }
+        }
+        
         $roomType->save();
         $room->save();
 
-        if ($roomType->save() && $room->save()) {
-            if ($request->facilites !== null ) {
-                Facility::where('room_id',$room->id)->delete();
-                $facilityCount = Count($request->facilities);
-                for ($i=0; $i < $facilityCount ; $i++) { 
-                    $facility = new Facility;
-                    $facility->room_id = $room->id;
-                    $facility->name = $request->facilities[$i];
-                    $facility->save(); 
-                }
-            }
-        }
-
+        DB::commit();
 
         return response()->json([
-            'roomtype'=>$roomType,
+            'roomtype'=>$roomType->with('room')->with('room.facility'),
             'message'=>'Room type is updated succesfully'
         ], 201);
+        
+        } catch (\Exception $e) {
+            DB::rollback();
+            return response()->json(['message' => 'Something went wrong with updating room'], 500);    
+        }
     }
 
     /**
@@ -207,14 +224,14 @@ class RoomTypeController extends Controller
     public function destroy($id)
     {
         $roomType = RoomType::findOrFail($id);
-    
-        // Delete facilities associated with the rooms
-        Room::where('roomtype_id', $roomType->id)->delete();
-    
-        // Delete rooms associated with the room type
-        Facility::whereIn('room_id', $roomType->rooms()->pluck('id'))->delete();
-    
-        // Delete the room type
+        $oldImageUrl = $roomType->room->image;
+        if ($oldImageUrl) {
+            $filename = basename($oldImageUrl);
+            $image_path = public_path('images/' . $filename);
+            if (file_exists($image_path)) {
+                unlink($image_path);
+            }
+        }
         $roomType->delete();
     
         return response()->json(['message' => 'Room type and associated rooms and facilities have been deleted successfully'], 200); 
