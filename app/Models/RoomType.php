@@ -2,8 +2,9 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\RoomNumber;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class RoomType extends Model
 {
@@ -13,6 +14,12 @@ class RoomType extends Model
     public function room()
     {
         return $this->belongsTo(Room::class,'id','roomtype_id');
+    }
+
+    
+    public function roomNumbers()
+    {
+        return $this->hasMany(RoomNumber::class,'roomtype_id','id');
     }
 
     

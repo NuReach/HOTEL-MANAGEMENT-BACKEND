@@ -5,6 +5,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\api\UserController;
 use App\Http\Controllers\api\RoomTypeController;
+use App\Http\Controllers\api\RoomNumberController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -39,6 +40,11 @@ Route::middleware(['auth:sanctum','seller'])->group(function () {
     });
     Route::controller(RoomTypeController::class)->group(function () {
         Route::delete('/roomstype/gallary/delete/{gallaryId}', 'deleteImageGallary');
+    });
+    Route::controller(RoomNumberController::class)->group(function () {
+        Route::post('/room/number/{room_type}/{room_id}', 'createRoomNumber');
+        Route::post('/room/number/update/{room_type}/{room_id}/{roomnumber_id}', 'updateRoomNumber');
+        Route::delete('/room/number/delete/{roomnumber_id}', 'deleteRoomNumber');
     });
 
 });

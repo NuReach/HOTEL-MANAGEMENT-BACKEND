@@ -21,6 +21,7 @@ class RoomTypeController extends Controller
         $user_id = $user->id;
         $roomTypes = RoomType::where('user_id',$user_id)
                     ->with('room')
+                    ->with('roomNumbers')
                     ->with('room.facilities')
                     ->with('room.gallary')
                     ->get();
