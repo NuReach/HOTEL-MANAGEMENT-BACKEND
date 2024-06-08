@@ -4,6 +4,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\api\UserController;
+use App\Http\Controllers\api\FrontendController;
 use App\Http\Controllers\api\RoomTypeController;
 use App\Http\Controllers\api\RoomNumberController;
 
@@ -47,6 +48,10 @@ Route::middleware(['auth:sanctum','seller'])->group(function () {
         Route::delete('/room/number/delete/{roomnumber_id}', 'deleteRoomNumber');
     });
 
+});
+
+Route::controller(FrontendController::class)->group(function () {
+    Route::post('/search/available/room/type', 'searchAvailableRoomType');
 });
 
 
