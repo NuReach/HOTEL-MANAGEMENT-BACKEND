@@ -21,17 +21,29 @@ class FrontendController extends Controller
         $bookings = RoomBooked::whereBetween('book_date', [$request->start_date, $request->end_date])
         ->get();
 
-        $occupiedRoomIds = $bookings->pluck('roomnumber_id'); 
+        $occupiedRoomNumberIds = $bookings->pluck('roomnumber_id'); 
 
-        $availableRoomNumbers = RoomNumber::whereHas('room', function ($query) use ($occupiedRoomIds, $request) {
+        $availableRoomNumbersId = RoomNumber::whereHas('room', function ($query) use ($occupiedRoomNumberIds, $request) {
             $query->where('total_adult', '>=', $request->total_adult);
         })
-        ->whereNotIn('id', $occupiedRoomIds)
+        ->whereNotIn('id', $occupiedRoomNumberIds)
         ->distinct()
         ->pluck('room_id');
 
-        $availableRoom = Room::whereIn('id',$availableRoomNumbers)->get();
+        $availableRoom = Room::whereIn('id',$availableRoomNumbersId)->get();
 
-        return response()->json($availableRoom, 200 );
+        $remainRoom = [];
+
+        foreach ($availableRoom as $key => $item) {
+            $occupiedRoomNumber = RoomNumber::where('room_id',$item->id)
+            ->whereIn('id',$occupiedRoomNumberIds)->get();
+            $remainRoom[] = [
+              'room' => $item,
+              'totalRoom' => sizeof($item->roomNumbers),
+              'occupied' => sizeof($occupiedRoomNumber)
+            ];
+          }
+
+        return response()->json($remainRoom, 200 );
     }
 }
