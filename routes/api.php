@@ -54,6 +54,12 @@ Route::controller(FrontendController::class)->group(function () {
     Route::post('/search/available/room/type', 'searchAvailableRoomType');
 });
 
+Route::middleware(['auth:sanctum'])->group(function () {
+    Route::controller(FrontendController::class)->group(function () {
+        Route::post('/create/booking', 'CreateBooking');
+    });
+});
+
 
 
 
