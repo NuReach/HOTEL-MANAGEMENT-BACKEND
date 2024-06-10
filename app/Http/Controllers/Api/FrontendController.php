@@ -70,31 +70,30 @@ class FrontendController extends Controller
         
         Stripe::setApiKey(env('STRIPE_KEY_SECRET'));
 
+        //map dates
+        $dayMapping = [];
+        for ($date = $checkIn; $date->lte($checkOut); $date->addDay()) {
+        $dayMapping[] = $date->format('Y-m-d');
+        }
         
+        //check available room numbers
+
+        $bookings = RoomBooked::whereBetween('book_date', [$request->check_in, $request->check_out])
+        ->get();
+
+        $occupiedRoomNumberIds = $bookings->pluck('roomnumber_id'); 
+
+        $availableRoomNumbers = RoomNumber::where('room_id',$request->room_id)
+        ->whereNotIn('id', $occupiedRoomNumberIds)
+        ->get();
+
+        if (sizeof($availableRoomNumbers) == 0) {
+            return response()->json(['message'=>'There is no remain room'], 500);
+        }
+
 
         DB::beginTransaction();
         try {
-            //map dates
-            $dayMapping = [];
-            for ($date = $checkIn; $date->lte($checkOut); $date->addDay()) {
-            $dayMapping[] = $date->format('Y-m-d');
-            }
-
-            //check available room numbers
-
-            $bookings = RoomBooked::whereBetween('book_date', [$request->check_in, $request->check_out])
-            ->get();
-
-            if (!$bookings) {
-                return response()->json(["message"=>"Something went wrong!"], 200);
-            }
-
-            $occupiedRoomNumberIds = $bookings->pluck('roomnumber_id'); 
-
-            $availableRoomNumbers = RoomNumber::where('room_id',$request->room_id)
-            ->whereNotIn('id', $occupiedRoomNumberIds)
-            ->get();
-
             //create booking
 
             $totalNights = sizeof($dayMapping)-1;
@@ -138,12 +137,24 @@ class FrontendController extends Controller
             $bookDetails->status = 1;
 
             $bookDetails->save();
-            
-            DB::commit();
 
+            $bookedRooms = [];
+            if ($bookDetails->save() && $paymentStatus=="succeeded") {
+                foreach ($dayMapping as $key => $item) {
+                    $roomBook = new RoomBooked();
+                    $roomBook->booking_id = $bookDetails->id;
+                    $roomBook->room_id = $request->room_id;
+                    $roomBook->roomnumber_id = $availableRoomNumbers[0]->id;
+                    $roomBook->book_date = $item;
+                    $roomBook->save();
+                    $bookedRooms[] = $roomBook;
+                }                      
+            }
+            DB::commit();
             return response()->json([
                 'message' => 'Your booking is successful',
-                'booking_detail' => $bookDetails
+                'booking_detail' => $bookDetails,
+                'booking_room' => $bookedRooms,
             ], 200);
 
         } catch (\Throwable $th) {
