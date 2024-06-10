@@ -12,6 +12,7 @@ class BookingController extends Controller
         $user_id = auth()->user()->id;
         if ($search == "all") {
             $bookings = BookDetail::with('room')
+            ->with('bookedRoomNumbers')
             ->with('room.roomType')
             ->with('room.roomType.user')
             ->whereHas('room.roomType.user', function ($query) use ($user_id) {
@@ -21,6 +22,7 @@ class BookingController extends Controller
             ->paginate($size);
         }else{
             $bookings = BookDetail::with('room')
+            ->with('bookedRoomNumbers')
             ->with('room.roomType')
             ->with('room.roomType.user')
             ->whereHas('room.roomType.user', function ($query) use ($search) {
