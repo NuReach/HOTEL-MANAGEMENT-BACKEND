@@ -9,4 +9,9 @@ class BookDetail extends Model
 {
     use HasFactory;
     protected $gaurded = [];
+
+    public function room ()
+    {
+        return $this->belongsTo(Room::class, 'room_id', 'id');
+    }
 }

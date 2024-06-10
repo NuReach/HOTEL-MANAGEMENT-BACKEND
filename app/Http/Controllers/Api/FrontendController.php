@@ -133,7 +133,7 @@ class FrontendController extends Controller
             $bookDetails->transation_id = $transactionId;
             $bookDetails->payment_status = $paymentStatus;
 
-            $bookDetails->code = $transactionId;
+            $bookDetails->code = $paymentStatus;
             $bookDetails->status = 1;
 
             $bookDetails->save();

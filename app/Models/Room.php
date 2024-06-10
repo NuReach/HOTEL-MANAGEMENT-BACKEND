@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Facility;
+use App\Models\RoomType;
 use App\Models\MultiImage;
 use App\Models\RoomNumber;
 use Illuminate\Database\Eloquent\Model;
@@ -26,5 +27,9 @@ class Room extends Model
     public function roomNumbers()
     {
         return $this->hasMany(RoomNumber::class);
+    }
+
+    public function roomType(){
+        return $this->belongsTo(RoomType::class, 'roomtype_id' , 'id');
     }
 }
