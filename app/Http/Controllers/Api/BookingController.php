@@ -37,4 +37,12 @@ class BookingController extends Controller
         }
         return response()->json($bookings, 200);
     }
+
+    public function getBookingById ( $booking_id ){
+        $bookingDetail = BookDetail::with('bookedRoomNumbers')
+        ->with('room.roomType')
+        ->with('room.roomType.user')
+        ->findOrFail($booking_id);
+        return response()->json($bookingDetail, 200);
+    }
 }
