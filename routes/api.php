@@ -52,6 +52,7 @@ Route::middleware(['auth:sanctum','seller'])->group(function () {
         Route::get('/bookings/{search}/{sortBy}/{sortDir}/{size}', 'getAllBookings');
         Route::get('/bookings/{bookings_id}', 'getBookingById');
         Route::post('/bookings/update/{bookings_id}', 'updateBooking');
+        Route::post('/create/booking/seller', 'createBookingFromSeller');
     });
 
 

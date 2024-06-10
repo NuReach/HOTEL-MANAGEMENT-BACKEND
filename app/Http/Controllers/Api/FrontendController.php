@@ -140,15 +140,17 @@ class FrontendController extends Controller
 
             $bookedRooms = [];
             if ($bookDetails->save() && $paymentStatus=="succeeded") {
-                foreach ($dayMapping as $key => $item) {
-                    $roomBook = new RoomBooked();
-                    $roomBook->booking_id = $bookDetails->id;
-                    $roomBook->room_id = $request->room_id;
-                    $roomBook->roomnumber_id = $availableRoomNumbers[0]->id;
-                    $roomBook->book_date = $item;
-                    $roomBook->save();
-                    $bookedRooms[] = $roomBook;
-                }                      
+                for ($i=0; $i < $number_of_rooms ; $i++) { 
+                    foreach ($dayMapping as $key => $item) {
+                        $roomBook = new RoomBooked();
+                        $roomBook->booking_id = $bookDetails->id;
+                        $roomBook->room_id = $request->room_id;
+                        $roomBook->roomnumber_id = $availableRoomNumbers[$i]->id;
+                        $roomBook->book_date = $item;
+                        $roomBook->save();
+                        $bookedRooms[] = $roomBook;
+                    }                                
+                }
             }
             DB::commit();
             return response()->json([

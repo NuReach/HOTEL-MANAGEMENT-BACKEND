@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\api;
 
 use Carbon\Carbon;
+use App\Models\Room;
 use App\Models\BookDetail;
 use App\Models\RoomBooked;
 use App\Models\RoomNumber;
@@ -11,6 +12,98 @@ use App\Http\Controllers\Controller;
 
 class BookingController extends Controller
 {
+    function createBookingFromSeller ( Request $request ){
+        $request->validate([
+            'room_id' => 'required|exists:rooms,id', 
+            'check_in' => 'required|date',
+            'check_out' => 'required|date|after:check_in', 
+            'person' => 'required|string', 
+            'number_of_rooms' => 'required|integer|min:1', 
+        ]);
+        $user_id = auth()->user()->id;
+        $checkIn = Carbon::parse($request->check_in);
+        $checkOut = Carbon::parse($request->check_out);
+
+        $room = Room::findOrFail($request->room_id);
+        //map dates
+        $dayMapping = [];
+        for ($date = $checkIn; $date->lte($checkOut); $date->addDay()) {
+        $dayMapping[] = $date->format('Y-m-d');
+        }
+        
+        //check available room numbers
+
+        $bookings = RoomBooked::whereBetween('book_date', [$request->check_in, $request->check_out])
+        ->get();
+
+        $occupiedRoomNumberIds = $bookings->pluck('roomnumber_id'); 
+
+        $availableRoomNumbers = RoomNumber::where('room_id',$request->room_id)
+        ->whereNotIn('id', $occupiedRoomNumberIds)
+        ->get();
+
+        if (sizeof($availableRoomNumbers) == 0) {
+            return response()->json(['message'=>'There is no remain room'], 500);
+        }
+        if (sizeof($availableRoomNumbers) < $request->number_of_rooms) {
+            return response()->json(['message'=>'Sorry, we have only '.sizeof($availableRoomNumbers). ' is no remain room'], 500);
+        }
+
+
+        $totalNights = sizeof($dayMapping)-1;
+
+        $number_of_rooms = $request->number_of_rooms;
+        $actual_price = $room->price;
+        $subtotal = $totalNights*$actual_price*$number_of_rooms;
+        $discount = $room->discount;
+        $total_price = $subtotal*(1-$discount/100);
+
+        $bookDetails = new BookDetail();
+
+        $bookDetails->room_id = $request->room_id;
+        $bookDetails->user_id = $user_id;
+        $bookDetails->check_in = $request->check_in;
+        $bookDetails->check_out = $request->check_out;
+        $bookDetails->person = $request->person;
+        $bookDetails->number_of_rooms = $number_of_rooms ;
+
+        $bookDetails->total_night = $totalNights; 
+        $bookDetails->actual_price = $actual_price;
+        $bookDetails->subtotal = $subtotal;
+        $bookDetails->discount = $discount;
+        $bookDetails->total_price = $total_price;
+
+        $paymentStatus = 'succeeded'; 
+
+        $bookDetails->payment_method = 'seller';
+        $bookDetails->payment_status = $paymentStatus;
+
+        $bookDetails->code = $paymentStatus;
+        $bookDetails->status = 1;
+
+        $bookDetails->save();
+
+        $bookedRooms = [];
+        if ($bookDetails->save() && $paymentStatus=="succeeded") {
+            for ($i=0; $i < $number_of_rooms ; $i++) { 
+                foreach ($dayMapping as $key => $item) {
+                    $roomBook = new RoomBooked();
+                    $roomBook->booking_id = $bookDetails->id;
+                    $roomBook->room_id = $request->room_id;
+                    $roomBook->roomnumber_id = $availableRoomNumbers[$i]->id;
+                    $roomBook->book_date = $item;
+                    $roomBook->save();
+                    $bookedRooms[] = $roomBook;
+                }                                
+            }
+        }
+        return response()->json([
+            'message' => 'Your booking is successful',
+            'booking_detail' => $bookDetails,
+            'booking_room' => $bookedRooms,
+        ], 200);
+    }
+
     function getAllBookings($search , $sortBy , $sortDir , $size ) {
         $user_id = auth()->user()->id;
         if ($search == "all") {
